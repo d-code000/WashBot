@@ -1,0 +1,28 @@
+version: 1
+formatters:
+  default:
+      format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: default
+    stream: ext://sys.stdout
+  file:
+    class: logging.handlers.RotatingFileHandler
+    level: INFO
+    formatter: default
+    filename: wash-bot.log
+    maxBytes: 10485760 # 10MB
+    backupCount: 20
+    encoding: utf8
+loggers:
+  __main__:
+    level: INFO
+    handlers: [ console ]
+    propogate: no
+  webparser:
+    level: INFO
+    handlers: [ console ]
+    propogate: no
+
