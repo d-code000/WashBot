@@ -1,9 +1,9 @@
 import logging
+from typing import Sequence
 
 import config
-import webparser as prs
-from service import cache
-import database as db
+from database import Machines
+from webparser import _MachineStatus, _TimeLastUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -21,16 +21,11 @@ TRANSLATE = {
     }
 
 
-@cache(ttl=config.TEXT_STATUS_TTL)
-async def get_status() -> dict:
-    machines = await db.get_machines()
-    status = await prs.get_machines_status()
-    time = await prs.get_time_last_update()
+async def get_status(machines:  Sequence[Machines], status: _MachineStatus, time: _TimeLastUpdate) -> dict:
     report = {
         "ru": f"Состояние машин {time[0]} в {time[1]}:\n",
         "en": f"Status of machines {time[0]} in {time[1]}:\n"
     }
-
     for lang in report.keys():
         for machine in machines:
             if lang != "ru":

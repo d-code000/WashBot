@@ -1,8 +1,8 @@
 import functools
 import logging
-from typing import Any, Sequence, Union, Tuple
+from typing import Any, Sequence, Union
 
-from sqlalchemy import Column, Row, RowMapping
+from sqlalchemy import Column
 from sqlalchemy import ForeignKey
 from sqlalchemy import Integer, BigInteger, String
 from sqlalchemy import select, update, delete, Row, RowMapping

@@ -6,15 +6,14 @@ from aiogram import Dispatcher
 
 import script
 import user_handlers
-from service import bot
+from service import bot, main_loops
 
 
 async def main():
     logger = logging.getLogger(__name__)
-    # await script.check_machines()
+    await script.check_machines()
     dp = Dispatcher()
     dp.include_routers(user_handlers.router_private)
-    main_loops = asyncio.get_event_loop()
     main_loops.create_task(script.update_data())
     await dp.start_polling(bot)
 

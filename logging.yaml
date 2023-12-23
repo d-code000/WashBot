@@ -19,27 +19,27 @@ handlers:
 loggers:
   __main__:
     level: INFO
-    handlers: [ console ]
+    handlers: [ file ]
     propogate: no
   aiogram:
     level: INFO
-    handlers: [ console ]
+    handlers: [ file ]
     propogate: no
   webparser:
     level: INFO
-    handlers: [ console ]
+    handlers: [ file ]
     propogate: no
   database:
     level: INFO
-    handlers: [ console ]
+    handlers: [ file ]
     propogate: No
   user_handlers:
     level: INFO
-    handlers: [ console ]
+    handlers: [ file ]
     propogate: No
   script:
     level: INFO
-    handlers: [ console ]
+    handlers: [ file ]
     propogate: No
 
 

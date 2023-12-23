@@ -10,7 +10,8 @@ from aiogram.exceptions import TelegramBadRequest
 
 import text
 import keyboard
-import database as db
+import database
+import webparser
 from database import Users, Machines, Subs
 from config import DEFAULT_LANG
 from config import LANGUAGES
@@ -25,8 +26,8 @@ class OrderSub(StatesGroup):
 
 
 async def check_is_user(message: Message) -> None:
-    if not await db.is_by_id(Users, message.from_user.id):
-        await db.add_user(
+    if not await database.is_by_id(Users, message.from_user.id):
+        await database.add_user(
             user_id=message.from_user.id,
             username=message.from_user.username,
             lang=message.from_user.language_code if message.from_user.language_code in LANGUAGES else DEFAULT_LANG
@@ -37,7 +38,7 @@ async def check_is_user(message: Message) -> None:
 async def command_start(message: Message) -> None:
     try:
         await check_is_user(message)
-        lang = await db.get_user_lang(message.from_user.id)
+        lang = await database.get_user_lang(message.from_user.id)
         await message.answer(text=text.description[lang],
                              reply_markup=keyboard.menu_lang
                              )
@@ -50,15 +51,20 @@ async def command_start(message: Message) -> None:
 @router_private.message(Command("status"))
 async def command_status(message: Message) -> None:
     try:
-        status = await text.get_status()
+        status = await webparser.get_machines_status()
+        time = await webparser.get_time_last_update()
         try:
             await check_is_user(message)
-            lang = await db.get_user_lang(message.from_user.id)
-            await message.answer(text=status[lang],
+            machines = await database.get_machines()
+            lang = await database.get_user_lang(message.from_user.id)
+            report = await text.get_status(machines, status, time)
+            await message.answer(text=report[lang],
                                  reply_markup=keyboard.menu_update[lang]
                                  )
         except ConnectionError:
-            await message.answer(text=status[DEFAULT_LANG],
+            machines = await webparser.get_machines()
+            report = await text.get_status(machines, status, time)
+            await message.answer(text=report[DEFAULT_LANG],
                                  reply_markup=keyboard.menu_update[DEFAULT_LANG]
                                  )
     except ConnectionError:
@@ -71,19 +77,24 @@ async def command_status(message: Message) -> None:
 async def callback_update(callback: CallbackQuery) -> None:
     await callback.answer()
     try:
-        status = await text.get_status()
+        status = await webparser.get_machines_status()
+        time = await webparser.get_time_last_update()
         try:
-            lang = await db.get_user_lang(callback.from_user.id)
+            machines = await database.get_machines()
+            lang = await database.get_user_lang(callback.from_user.id)
+            report = await text.get_status(machines, status, time)
             try:
-                await callback.message.edit_text(text=status[lang if lang else DEFAULT_LANG],
-                                                 reply_markup=keyboard.menu_update[lang if lang else DEFAULT_LANG]
+                await callback.message.edit_text(text=report[lang],
+                                                 reply_markup=keyboard.menu_update[lang]
                                                  )
             except TelegramBadRequest:
                 logger.debug("Status has not changed")
         except ConnectionError:
-            await callback.message.edit_text(text=status[DEFAULT_LANG],
-                                             reply_markup=keyboard.menu_update[DEFAULT_LANG]
-                                             )
+            machines = await webparser.get_machines()
+            report = await text.get_status(machines, status, time)
+            await callback.message.answer(text=report[DEFAULT_LANG],
+                                          reply_markup=keyboard.menu_update[DEFAULT_LANG]
+                                          )
     except ConnectionError:
         await callback.answer(text="The site is unavailable, please update the data later")
 
@@ -91,9 +102,9 @@ async def callback_update(callback: CallbackQuery) -> None:
 @router_private.message(Command("sub"))
 async def command_sub(message: Message, state: FSMContext) -> None:
     await check_is_user(message)
-    machines = await db.get_machines()
-    lang = await db.get_user_lang(message.from_user.id)
-    subs = list(await db.get_user_subs(message.from_user.id))
+    machines = await database.get_machines()
+    lang = await database.get_user_lang(message.from_user.id)
+    subs = list(await database.get_user_subs(message.from_user.id))
     kb = await keyboard.menu_sub(machines, subs)
     await message.answer(text=text.sub["start"][lang],
                          reply_markup=kb[lang]
@@ -141,14 +152,14 @@ async def callback_subs(callback: CallbackQuery, state: FSMContext) -> None:
     subs: list = data["subs"]
     await callback.answer(text.sub["subscribe"][lang])
     await callback.message.delete()
-    user_subs = await db.get_user_subs(callback.from_user.id)
+    user_subs = await database.get_user_subs(callback.from_user.id)
     for machine in machines:
         if machine.id in subs and machine.id not in user_subs:
-            await db.add_sub(user_id=callback.from_user.id,
-                             machine_id=machine.id)
+            await database.add_sub(user_id=callback.from_user.id,
+                                   machine_id=machine.id)
         elif machine.id not in subs and machine.id in user_subs:
-            await db.remove_by_id(obj_type=Subs,
-                                  obj_id=(callback.from_user.id, machine.id))
+            await database.remove_by_id(obj_type=Subs,
+                                        obj_id=(callback.from_user.id, machine.id))
     await state.clear()
 
 
@@ -163,8 +174,8 @@ async def callback_set_languages(callback: CallbackQuery) -> None:
         logger.debug("Language has not changed")
 
     try:
-        if await db.get_user_lang(callback.from_user.id) != callback.data:
-            await db.set_user_lang(callback.from_user.id, callback.data)
+        if await database.get_user_lang(callback.from_user.id) != callback.data:
+            await database.set_user_lang(callback.from_user.id, callback.data)
     except ConnectionError:
         pass
 
@@ -177,9 +188,9 @@ async def callback_delete(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router_private.message(Command("unsub"))
 async def command_unsub(message: Message) -> None:
-    lang = await db.get_user_lang(message.from_user.id)
+    lang = await database.get_user_lang(message.from_user.id)
     await message.answer(text=text.unsub[lang])
-    await db.remove_subs(message.from_user.id)
+    await database.remove_subs(message.from_user.id)
 
 
 @router_private.callback_query(
@@ -190,5 +201,5 @@ async def command_unsub(callback: CallbackQuery, state: FSMContext) -> None:
     lang: str = data["lang"]
     await callback.answer(text=text.unsub[lang])
     await callback.message.delete()
-    await db.remove_subs(callback.from_user.id)
+    await database.remove_subs(callback.from_user.id)
     await state.clear()

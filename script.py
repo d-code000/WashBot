@@ -25,38 +25,34 @@ async def check_machines() -> None:
 
 async def mailing(users_id: list[int], message: dict[str: str], reply_markup: dict[str: str]) -> None:
     for user_id in users_id:
-        if await database.is_by_id(
-            obj_type=Users,
-            obj_id=[user_id]
-        ):
-            lang = await database.get_user_lang(user_id)
-            try:
-                await bot.send_message(chat_id=user_id,
-                                       text=message[lang],
-                                       reply_markup=reply_markup[lang])
-            except TelegramForbiddenError:
-                await database.remove_by_id(
-                    obj_type=Users,
-                    obj_id=[user_id]
-                )
+        lang = await database.get_user_lang(user_id)
+        try:
+            await bot.send_message(chat_id=user_id,
+                                   text=message[lang],
+                                   reply_markup=reply_markup[lang])
+        except TelegramForbiddenError:
+            logger.error("User blocked bot")
+            await database.remove_by_id(
+                obj_type=Users,
+                obj_id=[user_id]
+            )
 
 
 async def update_data() -> None:
     old_status = await webparser.get_machines_status()
     while True:
         status = await webparser.get_machines_status()
-        time = await webparser.get_time_last_update()
         if status != old_status:
+            time = await webparser.get_time_last_update()
             machines = await database.get_machines()
             users_id = set()
             for machine in machines:
                 if status[machine.id] != old_status[machine.id]:
                     users_id.update(await database.get_sub_users(machine.id))
             users_id = list(users_id)
-            users_id.sort()
             await mailing(
                 users_id=users_id,
-                message=await text.get_status(status, time),
+                message=await text.get_status(machines, status, time),
                 reply_markup=keyboard.menu_update
             )
             old_status = status
