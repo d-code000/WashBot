@@ -21,8 +21,25 @@ loggers:
     level: INFO
     handlers: [ console ]
     propogate: no
+  aiogram:
+    level: INFO
+    handlers: [ console ]
+    propogate: no
   webparser:
     level: INFO
     handlers: [ console ]
     propogate: no
+  database:
+    level: INFO
+    handlers: [ console ]
+    propogate: No
+  user_handlers:
+    level: INFO
+    handlers: [ console ]
+    propogate: No
+  script:
+    level: INFO
+    handlers: [ console ]
+    propogate: No
+
 
