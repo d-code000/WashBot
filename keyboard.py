@@ -26,10 +26,11 @@ menu_update = {
     "ru": InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="🔄 Обновить", callback_data="update"),
-            ]
-        ] +
-        [
+                InlineKeyboardButton(text="🔄 Обновить", callback_data="update")
+            ],
+            [
+                InlineKeyboardButton(text="🔕 Отписаться", callback_data="unsub")
+            ],
             [
                 InlineKeyboardButton(text="🗑️ Удалить", callback_data="delete")
             ]
@@ -39,9 +40,27 @@ menu_update = {
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="🔄 Update", callback_data="update")
+            ],
+            [
+                InlineKeyboardButton(text="🔕 Unsubscribe", callback_data="unsub")
+            ],
+            [
+                InlineKeyboardButton(text="🗑️ Delete", callback_data="delete")
             ]
-        ] +
-        [
+        ]
+    )
+}
+
+menu_delete = {
+    "ru": InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🗑️ Удалить", callback_data="delete")
+            ]
+        ]
+    ),
+    "en": InlineKeyboardMarkup(
+        inline_keyboard=[
             [
                 InlineKeyboardButton(text="🗑️ Delete", callback_data="delete")
             ]

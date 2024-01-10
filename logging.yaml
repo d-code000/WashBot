@@ -1,7 +1,8 @@
 version: 1
 formatters:
   default:
-      format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 handlers:
   console:
     class: logging.StreamHandler
@@ -12,7 +13,7 @@ handlers:
     class: logging.handlers.RotatingFileHandler
     level: INFO
     formatter: default
-    filename: wash-bot.log
+    filename: log.log
     maxBytes: 10485760 # 10MB
     backupCount: 20
     encoding: utf8
@@ -22,6 +23,10 @@ loggers:
     handlers: [ file ]
     propogate: no
   aiogram:
+    level: INFO
+    handlers: [ file ]
+    propogate: no
+  scalene:
     level: INFO
     handlers: [ file ]
     propogate: no

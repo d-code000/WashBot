@@ -1,13 +1,14 @@
 import re
 import logging
-from typing import Union, Sequence
+from typing import Sequence
 
 import requests
 from bs4 import BeautifulSoup
+from aiohttp import ClientSession
+from aiohttp.client_exceptions import ClientError, ClientConnectorError, ClientResponseError
 
 
 import config
-from service import cache
 from database import Machines
 
 
@@ -17,35 +18,36 @@ _TimeLastUpdate = tuple[str, ...]
 logger = logging.getLogger(__name__)
 
 
-async def _get_site_soup() -> BeautifulSoup:
+async def _get_site_soup(session: ClientSession) -> BeautifulSoup:
     try:
-        r = requests.get(config.SITE_URL)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "lxml")
-        logger.info(f"Request to site {config.SITE_URL}")
-        return soup
-    except requests.exceptions.HTTPError as exc:
-        msg = f"HTTP error, status code {r.status_code}"
-        logger.error(msg)
-        raise ConnectionError(msg) from exc
-    except requests.exceptions.ConnectionError as exc:
+        async with session.get(config.SITE_URL) as response:
+            try:
+                response.raise_for_status()
+                soup = BeautifulSoup(await response.text(), "lxml")
+                logger.info(f"Request to site {config.SITE_URL}")
+                return soup
+            except ClientResponseError as exc:
+                msg = f"HTTP error, status code {response.status}"
+                logger.error(msg)
+                raise ConnectionError(msg) from exc
+    except ClientConnectorError as exc:
         msg = "Connection error"
         logger.error(msg)
         raise ConnectionError(msg) from exc
-    except requests.exceptions.RequestException:
+    except ClientError:
         logger.error("Other requests exceptions", exc_info=True)
 
 
-@cache(ttl=config.STATUS_TTL)
-async def get_machines_status() -> _MachineStatus:
-    site_soup = await _get_site_soup()
+async def get_machines_status(session: ClientSession) -> _MachineStatus:
+    site_soup = await _get_site_soup(session)
     machines_status = {}
     try:
-        for washing_machine in site_soup.find_all("div", class_=re.compile(r"col mb-3 childItem child.*")):
-            num = int(washing_machine.find("div", class_="text-center").text)
+        machines = site_soup.find_all("div", class_=re.compile(r"col mb-3 childItem child.*"))
+        for machine in machines:
+            num = int(machine.find("div", class_="text-center").text)
             status = re.search(
                 r"[^ ].*[^ ]",
-                washing_machine.find_all("div", class_="text-center")[1].text.replace("\n", "")
+                machine.find_all("div", class_="text-center")[1].text.replace("\n", "")
                 ).group()
             machines_status.update({num: status})
         return machines_status
@@ -55,9 +57,8 @@ async def get_machines_status() -> _MachineStatus:
         return ()
 
 
-@cache(ttl=config.TIME_LAST_UPDATE_TTL)
-async def get_time_last_update() -> _TimeLastUpdate:
-    site_soup = await _get_site_soup()
+async def get_time_last_update(session: ClientSession) -> _TimeLastUpdate:
+    site_soup = await _get_site_soup(session)
     try:
         time_last_update = site_soup.find("div", attrs={"data-toggle": "tooltip"}).text
         date = re.search(r"\d\d\.\d\d\.\d{4}", time_last_update).group()
@@ -69,11 +70,12 @@ async def get_time_last_update() -> _TimeLastUpdate:
         return tuple()
 
 
-async def get_machines() -> Sequence[Machines]:
-    site_soup = await _get_site_soup()
+async def get_machines(session: ClientSession) -> Sequence[Machines]:
+    site_soup = await _get_site_soup(session)
     result = []
     try:
-        for machine in site_soup.find_all("div", class_=re.compile(r"col mb-3 childItem child.*")):
+        machines = site_soup.find_all("div", class_=re.compile(r"col mb-3 childItem child.*"))
+        for machine in machines:
             num = int(machine.find("div", class_="text-center").text)
             kind = machine.div["title"]
             prise = machine.find("span", class_=re.compile(r"pl-1 pr-1 withTooltip.*")).text

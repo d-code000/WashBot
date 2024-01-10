@@ -6,7 +6,11 @@ from aiogram import Dispatcher
 
 import script
 import user_handlers
-from service import bot, main_loops
+from service import bot
+
+
+async def startup():
+    asyncio.create_task(script.update_data())
 
 
 async def main():
@@ -14,7 +18,7 @@ async def main():
     await script.check_machines()
     dp = Dispatcher()
     dp.include_routers(user_handlers.router_private)
-    main_loops.create_task(script.update_data())
+    dp.startup.register(startup)
     await dp.start_polling(bot)
 
 

@@ -1,9 +1,11 @@
 import logging
-from typing import Sequence
 
+from aiohttp import ClientSession
+
+import database
+import webparser
+from service import cache
 import config
-from database import Machines
-from webparser import _MachineStatus, _TimeLastUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,15 @@ TRANSLATE = {
     }
 
 
-async def get_status(machines:  Sequence[Machines], status: _MachineStatus, time: _TimeLastUpdate) -> dict:
+@cache(ttl=config.STATUS_TTL)
+async def get_status() -> dict[str: str]:
+    async with ClientSession() as session:
+        try:
+            machines = await database.get_machines()
+        except ConnectionError:
+            machines = await webparser.get_machines(session)
+        status = await webparser.get_machines_status(session)
+        time = await webparser.get_time_last_update(session)
     report = {
         "ru": f"Состояние машин {time[0]} в {time[1]}:\n",
         "en": f"Status of machines {time[0]} in {time[1]}:\n"
@@ -50,7 +60,7 @@ async def get_status(machines:  Sequence[Machines], status: _MachineStatus, time
 
 
 description = {
-    "ru": "Вас приветствует WashBot -  бот по отслеживанию 📈 статус машин.\n\n"
+    "ru": "Вас приветствует WashBot -  бот по отслеживанию 📈 статуса машин.\n\n"
           f"Устали каждый раз перезагружать <a href='{config.SITE_URL}'>сайт</a> 🔄 в надежде на то, "
           f"что какая-нибудь машина освободиться?"
           " Теперь вы можете просто подписаться на уведомления 🔔 и быть первым,"
@@ -59,7 +69,7 @@ description = {
           "/start - приветствие со списком доступных команд\n"
           "/status - текущий статус машин\n"
           "/sub - подписаться на уведомления\n"
-          "/unsub - отписаться от уведомлений\n\n"
+          "/unsub - отписаться от всехуведомлений\n\n"
           "🌐 Данный бот является парсером и поэтому работает только с данными сайта.\n"
           "🔄 Уведомления присылаются сразу же после обновления данных на сайте.\n"
           f"🛠️ Тех. поддержка и предложения по модернизации: <a href='{config.TECH_SUPPORT}'>Disha</a>\n\n"
@@ -75,7 +85,7 @@ description = {
           "/start - greeting with a list of available commands\n"
           "/status - current status of machines\n"
           "/sub - subscribe to notifications\n"
-          "/unsub - unsubscribe from notifications\n\n"
+          "/unsub - unsubscribe from all notifications\n\n"
           "🌐 This bot is a parser and therefore works only with site data.\n"
           "🔄 Notifications are sent immediately after updating the data on the site.\n"
           f"🛠️ Those. support and upgrade suggestions: <a href='{config.TECH_SUPPORT}'>Disha</a>\n\n"
@@ -96,4 +106,9 @@ sub = {
 unsub = {
     "ru": "Вы отписались от всех уведомлений",
     "en": "You have unsubscribed from all notifications"
+}
+
+error = {
+    "ru": "В данный момент сервис недоступен, мы уже работаем над проблемой",
+    "en": "The service is currently unavailable, we are already working on the problem"
 }
