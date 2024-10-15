@@ -1,7 +1,10 @@
-SITE_URL = "https://cabinet.unimetriq.com/client/d95fe2e686097d1d7d545d138f7a452a"
-DB_URL = "postgresql+asyncpg://dxcode000:cubeup@134.209.230.177/washbot-kp"
+import os
+
+SITE_URL = os.getenv("SITE_URL")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+DB_URL = "postgresql+asyncpg://6EZiYsxwreO1KH:EoOXHgSTXFj567@localhost/wash-bot"
 TECH_SUPPORT = "tg://user?id=6484181181"
 STATUS_TTL = "10s"
-DEFAULT_LANG = "en"
+DEFAULT_LANG = "ru"
 LANGUAGES = ["ru", "en"]
-UPDATE_TIME = 20
+UPDATE_TIME = 25

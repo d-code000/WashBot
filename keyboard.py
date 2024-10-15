@@ -3,7 +3,7 @@ from typing import Sequence
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from database import Machines
+from database import Machine
 from text import TRANSLATE
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ menu_delete = {
 }
 
 
-async def menu_sub(machines: Sequence[Machines], subs: list[int]) -> dict[str, InlineKeyboardMarkup]:
+async def menu_sub(machines: Sequence[Machine], subs: list[int]) -> dict[str, InlineKeyboardMarkup]:
     menu = {
         "ru": None,
         "en": None
@@ -87,15 +87,15 @@ async def menu_sub(machines: Sequence[Machines], subs: list[int]) -> dict[str, I
                     trans_type = machine.type
                     logger.warning(f"None translate tor type {trans_type}")
                 inline_keyboard[lang] += [[
-                    InlineKeyboardButton(text=f"{'➤ ' if machine.id in subs else ''} "
-                                              f"{trans_type} {machine.id}",
-                                         callback_data=f"m{machine.id}")
+                    InlineKeyboardButton(text=f"{'➤ ' if machine.seq_num in subs else ''} "
+                                              f"{trans_type} {machine.seq_num}",
+                                         callback_data=f"m{machine.seq_num}")
                 ]]
             else:
                 inline_keyboard[lang] += [[
-                    InlineKeyboardButton(text=f"{'➤ ' if machine.id in subs else ''} "
-                                              f"{machine.type} {machine.id}",
-                                         callback_data=f"m{machine.id}")
+                    InlineKeyboardButton(text=f"{'➤ ' if machine.seq_num in subs else ''} "
+                                              f"{machine.type} {machine.seq_num}",
+                                         callback_data=f"m{machine.seq_num}")
                 ]]
     inline_keyboard["ru"] += [
         [InlineKeyboardButton(text="🔔 Подписаться", callback_data="sub")],

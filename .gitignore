@@ -2,4 +2,7 @@
 /profile.json
 /profile.html
 /requirements.txt
-/log.log
+/environment.yml
+**/*.log
+**/*.env
+/.idea

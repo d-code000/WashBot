@@ -11,9 +11,11 @@ from aiogram.exceptions import TelegramBadRequest
 import text
 import keyboard
 import database
-from database import Users, Machines, Subs
+import script
+from database import User, Machine, Sub
 from config import DEFAULT_LANG
 from config import LANGUAGES
+from service import bot
 
 logger = logging.getLogger(__name__)
 router_private = Router()
@@ -24,19 +26,10 @@ class OrderSub(StatesGroup):
     choosing_sub = State()
 
 
-async def check_is_user(message: Message) -> None:
-    if not await database.is_by_id(Users, message.from_user.id):
-        await database.add_user(
-            user_id=message.from_user.id,
-            username=message.from_user.username,
-            lang=message.from_user.language_code if message.from_user.language_code in LANGUAGES else DEFAULT_LANG
-        )
-
-
 @router_private.message(Command("start"))
 async def command_start(message: Message) -> None:
     try:
-        await check_is_user(message)
+        await script.check_user(message)
         lang = await database.get_user_lang(message.from_user.id)
         await message.answer(text=text.description[lang],
                              reply_markup=keyboard.menu_lang
@@ -50,7 +43,7 @@ async def command_start(message: Message) -> None:
 @router_private.message(Command("status"))
 async def command_status(message: Message) -> None:
     try:
-        await check_is_user(message)
+        await script.check_user(message)
         lang = await database.get_user_lang(message.from_user.id)
     except ConnectionError:
         lang = DEFAULT_LANG
@@ -89,8 +82,8 @@ async def callback_update(callback: CallbackQuery) -> None:
 @router_private.message(Command("sub"))
 async def command_sub(message: Message, state: FSMContext) -> None:
     try:
-        await check_is_user(message)
-        machines = await database.get_machines()
+        await script.check_user(message)
+        machines = await database.get_machines(bot.id)
         lang = await database.get_user_lang(message.from_user.id)
         subs = list(await database.get_user_subs(message.from_user.id))
         kb = await keyboard.menu_sub(machines, subs)
@@ -115,7 +108,7 @@ async def command_sub(message: Message, state: FSMContext) -> None:
 )
 async def callback_set_subs(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
-    machines: Sequence[Machines] = data["machines"]
+    machines: Sequence[Machine] = data["machines"]
     lang: str = data["lang"]
     subs: list = data["subs"]
     sub = int(callback.data[1:])
@@ -129,7 +122,7 @@ async def callback_set_subs(callback: CallbackQuery, state: FSMContext) -> None:
                                          reply_markup=kb[lang]
                                          )
     except TelegramBadRequest:
-        logger.debug("Subs has not changed")
+        logger.debug("Sub has not changed")
     await state.update_data(machines=machines,
                             lang=lang,
                             subs=subs
@@ -142,19 +135,23 @@ async def callback_set_subs(callback: CallbackQuery, state: FSMContext) -> None:
 )
 async def callback_subs(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
-    machines: Sequence[Machines] = data["machines"]
+    machines: Sequence[Machine] = data["machines"]
     lang: str = data["lang"]
     subs: list = data["subs"]
     await callback.answer(text.sub["subscribe"][lang])
     await callback.message.delete()
     user_subs = await database.get_user_subs(callback.from_user.id)
     for machine in machines:
-        if machine.id in subs and machine.id not in user_subs:
-            await database.add_sub(user_id=callback.from_user.id,
-                                   machine_id=machine.id)
-        elif machine.id not in subs and machine.id in user_subs:
-            await database.remove_by_id(obj_type=Subs,
-                                        obj_id=(callback.from_user.id, machine.id))
+        if machine.seq_num in subs and machine.seq_num not in user_subs:
+            sub = Sub(
+                user_id=callback.from_user.id,
+                seq_num=machine.seq_num,
+                bot_id=machine.bot_id
+            )
+            await database.add_object(sub)
+        elif machine.seq_num not in subs and machine.seq_num in user_subs:
+            await database.remove_by_id(obj_type=Sub,
+                                        obj_id=(callback.from_user.id, machine.seq_num, machine.bot_id))
     await state.clear()
 
 

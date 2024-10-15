@@ -1,11 +1,11 @@
 import functools
 import logging
-from typing import Any, Sequence, Union
+from typing import Any, Sequence
 
 from sqlalchemy import Column
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, ForeignKeyConstraint
 from sqlalchemy import Integer, BigInteger, String
-from sqlalchemy import select, update, delete, Row, RowMapping
+from sqlalchemy import select, update, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,63 +24,86 @@ class Base(DeclarativeBase):
     pass
 
 
-class Users(Base):
-    __tablename__ = "Users"
+class Bot(Base):
+    __tablename__ = "Bot"
     id: Column = Column(BigInteger, primary_key=True)
     username = Column(String)
-    lang = Column(String(2))
-    sub = relationship("Subs", cascade="all,delete", backref="Users")
-    admin = relationship("Admins", cascade="all,delete", backref="Users")
+    user = relationship("User", cascade="all,delete", backref="Bot")
+    machine = relationship("Machine", cascade="all,delete", backref="Bot")
 
     def __repr__(self) -> str:
         return (
-            f"Users("
-            f"id={self.id!r}, "
-            f"username={self.username!r}, "
+            f"Bot("
+            f"id={self.id}, "
+            f"username={self.username}"
+            f")"
+        )
+
+
+class User(Base):
+    __tablename__ = "User"
+    id: Column = Column(BigInteger, primary_key=True)
+    bot_id = Column(ForeignKey(Bot.id))
+    username = Column(String)
+    lang = Column(String(2))
+    sub = relationship("Sub", cascade="all,delete", backref="User")
+    admin = relationship("Admin", cascade="all,delete", backref="User")
+
+    def __repr__(self) -> str:
+        return (
+            f"User("
+            f"id={self.id}, "
+            f"bot_id={self.bot_id}"
+            f"username={self.username}, "
             f"lang={self.lang}"
             f")"
         )
 
 
-class Admins(Base):
-    __tablename__ = "Admins"
-    user_id = Column(ForeignKey(Users.id), primary_key=True)
+class Admin(Base):
+    __tablename__ = "Admin"
+    user_id = Column(ForeignKey(User.id), primary_key=True)
 
     def __repr__(self) -> str:
         return (
-            f"Admins("
-            f"user_id={self.user_id!r}"
+            f"Admin("
+            f"user_id={self.user_id}"
             f")"
         )
 
 
-class Machines(Base):
-    __tablename__ = "Machines"
-    id: Column = Column(Integer, primary_key=True)
+class Machine(Base):
+    __tablename__ = "Machine"
+    seq_num = Column(Integer, primary_key=True)
+    bot_id = Column(ForeignKey(Bot.id), primary_key=True)
     type = Column(String)
     prise = Column(Integer)
-    sub = relationship("Subs", cascade="all,delete", backref="Machines")
+    sub = relationship("Sub", cascade="all,delete", backref="Machine")
 
     def __repr__(self) -> str:
         return (
-            f"Machines("
-            f"id={self.id}, "
+            f"Machine("
+            f"seq_num={self.seq_num}, "
+            f"bot_id={self.bot_id}, "
             f"type={self.type}, "
             f"prise={self.prise}"
             f")"
         )
 
 
-class Subs(Base):
-    __tablename__ = "Subs"
-    user_id = Column(ForeignKey(Users.id), primary_key=True)
-    machine_id = Column(ForeignKey(Machines.id), primary_key=True)
+class Sub(Base):
+    __tablename__ = "Sub"
+    user_id = Column(ForeignKey(User.id), primary_key=True)
+    seq_num: Column = Column(Integer, primary_key=True)
+    bot_id: Column = Column(BigInteger, primary_key=True)
+    machine_id = ForeignKeyConstraint([seq_num, bot_id], [Machine.seq_num, Machine.bot_id])
 
     def __repr__(self) -> str:
         return (
-            f"Subs("
-            f"user_id={self.user_id!r}, "
-            f"machine_id={self.machine_id}"
+            f"Sub("
+            f"user_id={self.user_id}, "
+            f"seq_num={self.seq_num}, "
+            f"bot_id={self.bot_id}"
             f")"
         )
 
@@ -105,75 +128,21 @@ def connect(func) -> Any:
 
 
 @connect
-async def add_user(_async_session: async_sessionmaker[AsyncSession],
-                   user_id: int,
-                   username: str = None,
-                   lang: str = "ru"
-                   ) -> None:
+async def add_object(_async_session: async_sessionmaker[AsyncSession],
+                     obj: [User, Admin, Machine, Sub, Bot]
+                     ) -> None:
     async with _async_session() as session:
-        user = Users(
-            id=user_id,
-            username=username,
-            lang=lang
-        )
-        session.add_all([user])
+        session.add_all([obj])
         try:
             await session.commit()
-            logger.info(f"Add user: {user.username}, id {user.id}")
+            logger.info(f"Add {obj.__tablename__} with id ?")
         except IntegrityError:
-            logger.error(f"Add user: user with id {user.id} is already exists")
-
-
-@connect
-async def add_admin(_async_session: async_sessionmaker[AsyncSession],
-                    user_id: int
-                    ) -> None:
-    async with _async_session() as session:
-        admin = Admins(
-            user_id=user_id
-        )
-        session.add_all([admin])
-        try:
-            await session.commit()
-            logger.info(f"Add admin: id {admin.user_id}")
-        except IntegrityError:
-            logger.error(f"Add admin: admin with id {user_id} is already exists or is not a user")
-
-
-@connect
-async def add_machine(_async_session: async_sessionmaker[AsyncSession],
-                      machine: Machines
-                      ) -> None:
-    async with _async_session() as session:
-        session.add_all([machine])
-        try:
-            await session.commit()
-            logger.info(f"Add machine: id {machine.id}")
-        except IntegrityError:
-            logger.error(f"Add machine: machine with id {machine.id} is already exists")
-
-
-@connect
-async def add_sub(_async_session: async_sessionmaker[AsyncSession],
-                  user_id: int,
-                  machine_id: int
-                  ) -> None:
-    async with _async_session() as session:
-        sub = Subs(
-            user_id=user_id,
-            machine_id=machine_id
-        )
-        session.add_all([sub])
-        try:
-            await session.commit()
-            logger.info(f"Add sub: {user_id} - {machine_id} (user id - machine id)")
-        except IntegrityError:
-            logger.error(f"Add sub: record with id {user_id}, {machine_id} is exists")
+            logger.error(f"{obj.__tablename__} with id ? is already exists")
 
 
 @connect
 async def remove_by_id(_async_session: async_sessionmaker[AsyncSession],
-                       obj_type: [Users, Admins, Machines, Subs],
+                       obj_type: [User, Admin, Machine, Sub, Bot],
                        obj_id: tuple[int, ...]
                        ) -> None:
     async with _async_session() as session:
@@ -187,18 +156,16 @@ async def remove_by_id(_async_session: async_sessionmaker[AsyncSession],
 
 
 @connect
-async def is_by_id(_async_session: async_sessionmaker[AsyncSession],
-                   obj_type: [Users, Admins, Machines, Subs],
-                   obj_id: tuple[int, ...]
-                   ) -> bool:
+async def get_by_id(_async_session: async_sessionmaker[AsyncSession],
+                    obj_type: [User, Admin, Machine, Sub, Bot],
+                    obj_id: tuple[int, ...]
+                    ) -> [User, Admin, Machine, Sub, Bot]:
     async with _async_session() as session:
         try:
             obj = await session.get(obj_type, obj_id)
-            return bool(obj)
+            return obj
         except InvalidRequestError:
             logger.error("Not all primary keys are specified when calling session.get")
-            logger.warning("An invalid value may have been returned")
-            return False
 
 
 @connect
@@ -207,23 +174,22 @@ async def set_user_lang(_async_session: async_sessionmaker[AsyncSession],
                         lang: str
                         ) -> None:
     stmt = (
-        update(Users)
-        .where(Users.id == user_id)
+        update(User)
+        .where(User.id == user_id)
         .values(lang=lang)
     )
     async with _async_session() as session:
         await session.execute(stmt)
         await session.commit()
-        logger.info(f"Changing the language of a user with an id {user_id}"
-                    f" {lang}")
+        logger.info(f"Changing the language of a user with an id {user_id} {lang}")
 
 
 @connect
 async def get_user_lang(_async_session: async_sessionmaker[AsyncSession],
                         user_id: int
                         ) -> str:
-    stmt = (select(Users.lang)
-            .where(Users.id == user_id))
+    stmt = (select(User.lang)
+            .where(User.id == user_id))
     async with _async_session() as session:
         result = await session.execute(stmt)
         return result.scalar()
@@ -231,8 +197,11 @@ async def get_user_lang(_async_session: async_sessionmaker[AsyncSession],
 
 @connect
 async def get_machines(_async_session: async_sessionmaker[AsyncSession],
-                       ) -> Sequence[Machines]:
-    stmt = select(Machines).order_by(Machines.id)
+                       bot_id: int
+                       ) -> Sequence[Machine]:
+    stmt = (select(Machine)
+            .where(Machine.bot_id == bot_id)
+            .order_by(Machine.seq_num))
     async with _async_session() as session:
         machines = await session.scalars(stmt)
         return machines.all()
@@ -241,10 +210,10 @@ async def get_machines(_async_session: async_sessionmaker[AsyncSession],
 @connect
 async def get_user_subs(_async_session: async_sessionmaker[AsyncSession],
                         user_id: int
-                        ) -> tuple[Union[Union[Row, RowMapping], Any], ...]:
-    stmt = (select(Subs.machine_id)
-            .where(Subs.user_id == user_id)
-            .order_by(Subs.machine_id))
+                        ) -> tuple[int]:
+    stmt = (select(Sub.seq_num)
+            .where(Sub.user_id == user_id)
+            .order_by(Sub.seq_num))
     async with _async_session() as session:
         subs = await session.scalars(stmt)
         return tuple(subs.all())
@@ -252,11 +221,13 @@ async def get_user_subs(_async_session: async_sessionmaker[AsyncSession],
 
 @connect
 async def get_sub_users(_async_session: async_sessionmaker[AsyncSession],
-                        machine_id: int
+                        seq_num: int,
+                        bot_id: int
                         ) -> tuple[int]:
-    stmt = (select(Subs.user_id)
-            .where(Subs.machine_id == machine_id)
-            .order_by(Subs.user_id))
+    stmt = (select(Sub.user_id)
+            .where(Sub.seq_num == seq_num)
+            .where(Sub.bot_id == bot_id)
+            .order_by(Sub.user_id))
     async with _async_session() as session:
         users_id = await session.scalars(stmt)
         return tuple(users_id.all())
@@ -266,8 +237,24 @@ async def get_sub_users(_async_session: async_sessionmaker[AsyncSession],
 async def remove_subs(_async_session: async_sessionmaker[AsyncSession],
                       user_id: int
                       ) -> None:
-    stmt = delete(Subs).where(Subs.user_id == user_id)
+    stmt = delete(Sub).where(Sub.user_id == user_id)
     async with _async_session() as session:
         await session.execute(stmt)
         await session.commit()
         logger.info(f"Remove subs of a user with id {user_id}")
+
+
+@connect
+async def update_bot_id(_async_session: async_sessionmaker[AsyncSession],
+                        user_id: int,
+                        bot_id: int
+                        ) -> None:
+    stmt = (
+        update(User)
+        .where(User.id == user_id)
+        .values(bot_id=bot_id)
+    )
+    async with _async_session() as session:
+        await session.execute(stmt)
+        await session.commit()
+        logger.info(f"User {user_id} change new Bot {bot_id}")

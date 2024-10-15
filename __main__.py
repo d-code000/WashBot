@@ -15,11 +15,16 @@ async def startup():
 
 async def main():
     logger = logging.getLogger(__name__)
+    await script.check_bot()
     await script.check_machines()
     dp = Dispatcher()
     dp.include_routers(user_handlers.router_private)
     dp.startup.register(startup)
-    await dp.start_polling(bot)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    finally:
+        await bot.session.close()
 
 
 if __name__ == "__main__":

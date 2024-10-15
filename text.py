@@ -5,6 +5,7 @@ from aiohttp import ClientSession
 import database
 import webparser
 from service import cache
+from service import bot
 import config
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ TRANSLATE = {
 async def get_status() -> dict[str: str]:
     async with ClientSession() as session:
         try:
-            machines = await database.get_machines()
+            machines = await database.get_machines(bot.id)
         except ConnectionError:
             machines = await webparser.get_machines(session)
         status = await webparser.get_machines_status(session)
@@ -45,17 +46,17 @@ async def get_status() -> dict[str: str]:
                     trans_type = machine.type
                     logger.warning(f"None translate tor type {trans_type}")
                 try:
-                    trans_status = TRANSLATE[lang][status[machine.id]]
+                    trans_status = TRANSLATE[lang][status[machine.seq_num]]
                 except KeyError:
-                    trans_status = status[machine.id]
+                    trans_status = status[machine.seq_num]
                     logger.warning(f"None translate tor status {trans_status}")
-                report[lang] += (f"{'🟢' if status[machine.id] == 'Свободно' else '🔴'}"
-                                 f" {trans_type} {machine.id}"
+                report[lang] += (f"{'🟢' if status[machine.seq_num] == 'Свободно' else '🔴'}"
+                                 f" {trans_type} {machine.seq_num}"
                                  f" - {trans_status}\n")
             else:
-                report[lang] += (f"{'🟢' if status[machine.id] == 'Свободно' else '🔴'}"
-                                 f" {machine.type} {machine.id}"
-                                 f" - {status[machine.id]}\n")
+                report[lang] += (f"{'🟢' if status[machine.seq_num] == 'Свободно' else '🔴'}"
+                                 f" {machine.type} {machine.seq_num}"
+                                 f" - {status[machine.seq_num]}\n")
     return report
 
 

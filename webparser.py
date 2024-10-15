@@ -2,14 +2,13 @@ import re
 import logging
 from typing import Sequence
 
-import requests
 from bs4 import BeautifulSoup
 from aiohttp import ClientSession
 from aiohttp.client_exceptions import ClientError, ClientConnectorError, ClientResponseError
 
 
 import config
-from database import Machines
+from database import Machine
 
 
 _MachineStatus = dict[int: str]
@@ -70,7 +69,7 @@ async def get_time_last_update(session: ClientSession) -> _TimeLastUpdate:
         return tuple()
 
 
-async def get_machines(session: ClientSession) -> Sequence[Machines]:
+async def get_machines(session: ClientSession) -> Sequence[Machine]:
     site_soup = await _get_site_soup(session)
     result = []
     try:
@@ -80,8 +79,8 @@ async def get_machines(session: ClientSession) -> Sequence[Machines]:
             kind = machine.div["title"]
             prise = machine.find("span", class_=re.compile(r"pl-1 pr-1 withTooltip.*")).text
             prise = int(re.search(r"\d+", prise).group())
-            result.append(Machines(
-                id=num,
+            result.append(Machine(
+                seq_num=num,
                 type=kind,
                 prise=prise
             ))
