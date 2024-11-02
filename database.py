@@ -31,14 +31,6 @@ class Bot(Base):
     user = relationship("User", cascade="all,delete", backref="Bot")
     machine = relationship("Machine", cascade="all,delete", backref="Bot")
 
-    def __repr__(self) -> str:
-        return (
-            f"Bot("
-            f"id={self.id}, "
-            f"username={self.username}"
-            f")"
-        )
-
 
 class User(Base):
     __tablename__ = "User"
@@ -49,27 +41,10 @@ class User(Base):
     sub = relationship("Sub", cascade="all,delete", backref="User")
     admin = relationship("Admin", cascade="all,delete", backref="User")
 
-    def __repr__(self) -> str:
-        return (
-            f"User("
-            f"id={self.id}, "
-            f"bot_id={self.bot_id}"
-            f"username={self.username}, "
-            f"lang={self.lang}"
-            f")"
-        )
-
 
 class Admin(Base):
     __tablename__ = "Admin"
     user_id = Column(ForeignKey(User.id), primary_key=True)
-
-    def __repr__(self) -> str:
-        return (
-            f"Admin("
-            f"user_id={self.user_id}"
-            f")"
-        )
 
 
 class Machine(Base):
@@ -80,16 +55,6 @@ class Machine(Base):
     prise = Column(Integer)
     sub = relationship("Sub", cascade="all,delete", backref="Machine")
 
-    def __repr__(self) -> str:
-        return (
-            f"Machine("
-            f"seq_num={self.seq_num}, "
-            f"bot_id={self.bot_id}, "
-            f"type={self.type}, "
-            f"prise={self.prise}"
-            f")"
-        )
-
 
 class Sub(Base):
     __tablename__ = "Sub"
@@ -97,15 +62,6 @@ class Sub(Base):
     seq_num: Column = Column(Integer, primary_key=True)
     bot_id: Column = Column(BigInteger, primary_key=True)
     machine_id = ForeignKeyConstraint([seq_num, bot_id], [Machine.seq_num, Machine.bot_id])
-
-    def __repr__(self) -> str:
-        return (
-            f"Sub("
-            f"user_id={self.user_id}, "
-            f"seq_num={self.seq_num}, "
-            f"bot_id={self.bot_id}"
-            f")"
-        )
 
 
 def connect(func) -> Any:
